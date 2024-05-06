@@ -1,0 +1,60 @@
+version: "3.8"
+services:
+    bitcoind:
+        image: signet
+        container_name: bitcoind
+        user: 0:0
+        restart: on-failure
+        stop_grace_period: 30s
+        ports:
+            - 38332:38332
+        volumes:
+            - /src/bitcoin/src/signet
+        networks:
+            - bitcoin_network
+    electrs:
+        image: ghcr.io/vulpemventures/electrs:latest
+        container_name: electrs
+        entrypoint:
+            - /build/electrs
+        command:
+            - -vvvv
+            - --network
+            - signet
+            - --daemon-dir
+            - /src/bitcoin/src/signet/bitcoin.conf
+            - --daemon-rpc-addr
+            - bitcoind:38332
+            - --cookie
+            - alice:alice
+            - --http-addr
+            - 0.0.0.0:30000
+            - --electrum-rpc-addr
+            - 0.0.0.0:50000
+            - --cors
+            - "*"
+            - --jsonrpc-import
+        depends_on:
+            - bitcoind
+        ports:
+            - 50000:50000
+            - 30000:30000
+        volumes:
+            - /electrs/data
+        restart: unless-stopped
+        networks:
+            - bitcoin_network
+    esplora:
+        image: ghcr.io/vulpemventures/esplora:latest
+        container_name: esplora
+        depends_on:
+            - electrs
+        environment:
+            API_URL: http://localhost:30000
+        ports:
+            - 5000:5000
+        restart: unless-stopped
+
+networks:
+    bitcoin_network:
+        driver: bridge
